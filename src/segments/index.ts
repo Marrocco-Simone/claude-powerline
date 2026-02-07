@@ -9,6 +9,7 @@ export {
 } from "./session";
 export { ContextProvider, ContextInfo } from "./context";
 export { MetricsProvider, MetricsInfo } from "./metrics";
+export { RateLimitsProvider, RateLimitsInfo } from "./rateLimits";
 export {
   SegmentRenderer,
   PowerlineSymbols,
@@ -22,4 +23,5 @@ export {
   TodaySegmentConfig,
   VersionSegmentConfig,
   EnvSegmentConfig,
+  RateLimitsSegmentConfig,
 } from "./renderer";

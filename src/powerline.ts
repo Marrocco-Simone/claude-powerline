@@ -30,9 +30,11 @@ import {
   TodaySegmentConfig,
   VersionSegmentConfig,
   EnvSegmentConfig,
+  RateLimitsSegmentConfig,
 } from "./segments";
 import { BlockProvider, BlockInfo } from "./segments/block";
 import { TodayProvider, TodayInfo } from "./segments/today";
+import { RateLimitsProvider, RateLimitsInfo } from "./segments/rateLimits";
 import { SYMBOLS, TEXT_SYMBOLS, RESET_CODE } from "./utils/constants";
 import { getTerminalWidth, visibleLength } from "./utils/terminal";
 
@@ -52,6 +54,7 @@ export class PowerlineRenderer {
   private _gitService?: GitService;
   private _tmuxService?: TmuxService;
   private _metricsProvider?: MetricsProvider;
+  private _rateLimitsProvider?: RateLimitsProvider;
   private _segmentRenderer?: SegmentRenderer;
 
   constructor(private readonly config: PowerlineConfig) {
@@ -107,6 +110,13 @@ export class PowerlineRenderer {
     return this._metricsProvider;
   }
 
+  private get rateLimitsProvider(): RateLimitsProvider {
+    if (!this._rateLimitsProvider) {
+      this._rateLimitsProvider = new RateLimitsProvider();
+    }
+    return this._rateLimitsProvider;
+  }
+
   private get segmentRenderer(): SegmentRenderer {
     if (!this._segmentRenderer) {
       this._segmentRenderer = new SegmentRenderer(this.config, this.symbols);
@@ -141,6 +151,10 @@ export class PowerlineRenderer {
       ? await this.metricsProvider.getMetricsInfo(hookData.session_id, hookData)
       : null;
 
+    const rateLimitsInfo = this.needsSegmentInfo("rateLimits")
+      ? await this.rateLimitsProvider.getRateLimitsInfo(hookData)
+      : null;
+
     if (this.config.display.autoWrap) {
       return this.generateAutoWrapStatusline(
         hookData,
@@ -148,7 +162,8 @@ export class PowerlineRenderer {
         blockInfo,
         todayInfo,
         contextInfo,
-        metricsInfo
+        metricsInfo,
+        rateLimitsInfo
       );
     }
 
@@ -161,7 +176,8 @@ export class PowerlineRenderer {
           blockInfo,
           todayInfo,
           contextInfo,
-          metricsInfo
+          metricsInfo,
+          rateLimitsInfo
         )
       )
     );
@@ -175,7 +191,8 @@ export class PowerlineRenderer {
     blockInfo: BlockInfo | null,
     todayInfo: TodayInfo | null,
     contextInfo: ContextInfo | null,
-    metricsInfo: MetricsInfo | null
+    metricsInfo: MetricsInfo | null,
+    rateLimitsInfo: RateLimitsInfo | null
   ): Promise<string> {
     const colors = this.getThemeColors();
     const currentDir = hookData.workspace?.current_dir || hookData.cwd || "/";
@@ -200,6 +217,7 @@ export class PowerlineRenderer {
           todayInfo,
           contextInfo,
           metricsInfo,
+          rateLimitsInfo,
           colors,
           currentDir
         );
@@ -298,7 +316,8 @@ export class PowerlineRenderer {
     blockInfo: BlockInfo | null,
     todayInfo: TodayInfo | null,
     contextInfo: ContextInfo | null,
-    metricsInfo: MetricsInfo | null
+    metricsInfo: MetricsInfo | null,
+    rateLimitsInfo: RateLimitsInfo | null
   ): Promise<string> {
     const colors = this.getThemeColors();
     const currentDir = hookData.workspace?.current_dir || hookData.cwd || "/";
@@ -319,6 +338,7 @@ export class PowerlineRenderer {
         todayInfo,
         contextInfo,
         metricsInfo,
+        rateLimitsInfo,
         colors,
         currentDir
       );
@@ -344,6 +364,7 @@ export class PowerlineRenderer {
     todayInfo: TodayInfo | null,
     contextInfo: ContextInfo | null,
     metricsInfo: MetricsInfo | null,
+    rateLimitsInfo: RateLimitsInfo | null,
     colors: PowerlineColors,
     currentDir: string
   ) {
@@ -422,6 +443,14 @@ export class PowerlineRenderer {
 
     if (segment.type === "env") {
       return this.segmentRenderer.renderEnv(colors, segment.config as EnvSegmentConfig);
+    }
+
+    if (segment.type === "rateLimits") {
+      return this.renderRateLimitsSegment(
+        segment.config as RateLimitsSegmentConfig,
+        rateLimitsInfo,
+        colors
+      );
     }
 
     return null;
@@ -520,6 +549,15 @@ export class PowerlineRenderer {
     return this.segmentRenderer.renderVersion(hookData, colors, config);
   }
 
+  private renderRateLimitsSegment(
+    config: RateLimitsSegmentConfig,
+    rateLimitsInfo: RateLimitsInfo | null,
+    colors: PowerlineColors
+  ) {
+    if (!this.needsSegmentInfo("rateLimits")) return null;
+    return this.segmentRenderer.renderRateLimits(rateLimitsInfo, colors, config);
+  }
+
   private initializeSymbols(): PowerlineSymbols {
     const style = this.config.display.style;
     const charset = this.config.display.charset || "unicode";
@@ -555,6 +593,8 @@ export class PowerlineRenderer {
       metrics_lines_removed: symbolSet.metrics_lines_removed,
       metrics_burn: symbolSet.metrics_burn,
       version: symbolSet.version,
+      rate_limits_session: symbolSet.rate_limits_session,
+      rate_limits_weekly: symbolSet.rate_limits_weekly,
       bar_filled: symbolSet.bar_filled,
       bar_empty: symbolSet.bar_empty,
       env: symbolSet.env,
@@ -626,6 +666,9 @@ export class PowerlineRenderer {
     const metrics = getSegmentColors("metrics");
     const version = getSegmentColors("version");
     const env = getSegmentColors("env");
+    const rateLimits = getSegmentColors("rateLimits");
+    const rateLimitsWarning = getSegmentColors("rateLimitsWarning");
+    const rateLimitsCritical = getSegmentColors("rateLimitsCritical");
 
     return {
       reset: colorSupport === "none" ? "" : RESET_CODE,
@@ -655,6 +698,12 @@ export class PowerlineRenderer {
       versionFg: version.fg,
       envBg: env.bg,
       envFg: env.fg,
+      rateLimitsBg: rateLimits.bg,
+      rateLimitsFg: rateLimits.fg,
+      rateLimitsWarningBg: rateLimitsWarning.bg,
+      rateLimitsWarningFg: rateLimitsWarning.fg,
+      rateLimitsCriticalBg: rateLimitsCritical.bg,
+      rateLimitsCriticalFg: rateLimitsCritical.fg,
     };
   }
 
@@ -685,6 +734,8 @@ export class PowerlineRenderer {
         return colors.versionBg;
       case "env":
         return colors.envBg;
+      case "rateLimits":
+        return colors.rateLimitsBg;
       default:
         return colors.modeBg;
     }

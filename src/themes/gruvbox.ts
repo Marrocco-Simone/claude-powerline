@@ -14,6 +14,9 @@ export const gruvboxTheme: ColorTheme = {
   metrics: { bg: "#d3869b", fg: "#282828" },
   version: { bg: "#504945", fg: "#8ec07c" },
   env: { bg: "#3c3836", fg: "#d3869b" },
+  rateLimits: { bg: "#282828", fg: "#83a598" },
+  rateLimitsWarning: { bg: "#d79921", fg: "#282828" },
+  rateLimitsCritical: { bg: "#cc241d", fg: "#ebdbb2" },
 };
 
 export const gruvboxAnsi256Theme: ColorTheme = {
@@ -30,6 +33,9 @@ export const gruvboxAnsi256Theme: ColorTheme = {
   metrics: { bg: "#d787af", fg: "#303030" },
   version: { bg: "#585858", fg: "#87af87" },
   env: { bg: "#444444", fg: "#d787af" },
+  rateLimits: { bg: "#303030", fg: "#87afaf" },
+  rateLimitsWarning: { bg: "#d7af00", fg: "#303030" },
+  rateLimitsCritical: { bg: "#d70000", fg: "#ffffaf" },
 };
 
 export const gruvboxAnsiTheme: ColorTheme = {
@@ -46,4 +52,7 @@ export const gruvboxAnsiTheme: ColorTheme = {
   metrics: { bg: "#ff87af", fg: "#444444" },
   version: { bg: "#808080", fg: "#00d787" },
   env: { bg: "#585858", fg: "#ff87af" },
+  rateLimits: { bg: "#444444", fg: "#00afff" },
+  rateLimitsWarning: { bg: "#d7af00", fg: "#000000" },
+  rateLimitsCritical: { bg: "#d70000", fg: "#ffffff" },
 };

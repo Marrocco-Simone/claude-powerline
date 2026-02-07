@@ -14,6 +14,9 @@ export const nordTheme: ColorTheme = {
   metrics: { bg: "#b48ead", fg: "#2e3440" },
   version: { bg: "#434c5e", fg: "#88c0d0" },
   env: { bg: "#3b4252", fg: "#b48ead" },
+  rateLimits: { bg: "#2e3440", fg: "#88c0d0" },
+  rateLimitsWarning: { bg: "#d08770", fg: "#2e3440" },
+  rateLimitsCritical: { bg: "#bf616a", fg: "#eceff4" },
 };
 
 export const nordAnsi256Theme: ColorTheme = {
@@ -30,6 +33,9 @@ export const nordAnsi256Theme: ColorTheme = {
   metrics: { bg: "#d787af", fg: "#3a3a3a" },
   version: { bg: "#5f87af", fg: "#5fafaf" },
   env: { bg: "#4e4e4e", fg: "#d787af" },
+  rateLimits: { bg: "#3a3a3a", fg: "#5fafaf" },
+  rateLimitsWarning: { bg: "#d7875f", fg: "#3a3a3a" },
+  rateLimitsCritical: { bg: "#d75f5f", fg: "#ffffff" },
 };
 
 export const nordAnsiTheme: ColorTheme = {
@@ -46,4 +52,7 @@ export const nordAnsiTheme: ColorTheme = {
   metrics: { bg: "#ff87d7", fg: "#444444" },
   version: { bg: "#0087af", fg: "#00d7d7" },
   env: { bg: "#585858", fg: "#ff87af" },
+  rateLimits: { bg: "#444444", fg: "#00d7d7" },
+  rateLimitsWarning: { bg: "#d78700", fg: "#000000" },
+  rateLimitsCritical: { bg: "#d75f5f", fg: "#ffffff" },
 };
