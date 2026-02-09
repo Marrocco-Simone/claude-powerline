@@ -814,11 +814,11 @@ export class SegmentRenderer {
     rateLimitsInfo: RateLimitsInfo | null,
     colors: PowerlineColors,
     config?: RateLimitsSegmentConfig,
-  ): SegmentData | null {
-    if (!rateLimitsInfo) return null;
+  ): SegmentData[] {
+    if (!rateLimitsInfo) return [];
 
     const show = config?.show || "both";
-    const parts: string[] = [];
+    const segments: SegmentData[] = [];
 
     const sessionPct = rateLimitsInfo.session?.usedPercentage;
     const weeklyPct = rateLimitsInfo.weekly?.usedPercentage;
@@ -828,7 +828,12 @@ export class SegmentRenderer {
       if (config?.showResetTime && rateLimitsInfo.session?.resetsAt) {
         resetStr = ` ${this.formatResetCountdown(rateLimitsInfo.session.resetsAt)}`;
       }
-      parts.push(`${this.symbols.rate_limits_session} ${Math.round(sessionPct)}%${resetStr}`);
+      const [bgColor, fgColor] = this.getRateLimitColors(sessionPct, colors);
+      segments.push({
+        text: `${this.symbols.rate_limits_session} ${Math.round(sessionPct)}%${resetStr}`,
+        bgColor,
+        fgColor,
+      });
     }
 
     if ((show === "both" || show === "weekly") && weeklyPct !== undefined) {
@@ -836,7 +841,12 @@ export class SegmentRenderer {
       if (config?.showResetTime && rateLimitsInfo.weekly?.resetsAt) {
         resetStr = ` ${this.formatResetCountdown(rateLimitsInfo.weekly.resetsAt)}`;
       }
-      parts.push(`${this.symbols.rate_limits_weekly} ${Math.round(weeklyPct)}%${resetStr}`);
+      const [bgColor, fgColor] = this.getRateLimitColors(weeklyPct, colors);
+      segments.push({
+        text: `${this.symbols.rate_limits_weekly} ${Math.round(weeklyPct)}%${resetStr}`,
+        bgColor,
+        fgColor,
+      });
     }
 
     if (
@@ -844,29 +854,31 @@ export class SegmentRenderer {
       rateLimitsInfo.extraUsage?.enabled
     ) {
       const extra = rateLimitsInfo.extraUsage;
-      parts.push(`$${extra.usedDollars.toFixed(2)}/$${extra.limitDollars.toFixed(2)}`);
+      const extraPct = extra.limitDollars > 0
+        ? (extra.usedDollars / extra.limitDollars) * 100
+        : 0;
+      const [bgColor, fgColor] = this.getRateLimitColors(extraPct, colors);
+      segments.push({
+        text: `$${extra.usedDollars.toFixed(2)}/$${extra.limitDollars.toFixed(2)}`,
+        bgColor,
+        fgColor,
+      });
     }
 
-    if (parts.length === 0) return null;
+    return segments;
+  }
 
-    const maxPct = Math.max(sessionPct ?? 0, weeklyPct ?? 0);
-
-    let bgColor = colors.rateLimitsBg;
-    let fgColor = colors.rateLimitsFg;
-
-    if (maxPct >= 80) {
-      bgColor = colors.rateLimitsCriticalBg;
-      fgColor = colors.rateLimitsCriticalFg;
-    } else if (maxPct >= 50) {
-      bgColor = colors.rateLimitsWarningBg;
-      fgColor = colors.rateLimitsWarningFg;
+  private getRateLimitColors(
+    pct: number,
+    colors: PowerlineColors,
+  ): [string, string] {
+    if (pct >= 90) {
+      return [colors.rateLimitsCriticalBg, colors.rateLimitsCriticalFg];
     }
-
-    return {
-      text: parts.join(" "),
-      bgColor,
-      fgColor,
-    };
+    if (pct >= 80) {
+      return [colors.rateLimitsWarningBg, colors.rateLimitsWarningFg];
+    }
+    return [colors.rateLimitsBg, colors.rateLimitsFg];
   }
 
   private formatResetCountdown(resetsAt: string): string {

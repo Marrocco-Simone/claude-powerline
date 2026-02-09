@@ -31,6 +31,7 @@ import {
   VersionSegmentConfig,
   EnvSegmentConfig,
   RateLimitsSegmentConfig,
+  SegmentData,
 } from "./segments";
 import { BlockProvider, BlockInfo } from "./segments/block";
 import { TodayProvider, TodayInfo } from "./segments/today";
@@ -223,12 +224,15 @@ export class PowerlineRenderer {
         );
 
         if (segmentData) {
-          renderedSegments.push({
-            type: segment.type,
-            text: segmentData.text,
-            bgColor: segmentData.bgColor,
-            fgColor: segmentData.fgColor,
-          });
+          const dataArray = Array.isArray(segmentData) ? segmentData : [segmentData];
+          for (const data of dataArray) {
+            renderedSegments.push({
+              type: segment.type,
+              text: data.text,
+              bgColor: data.bgColor,
+              fgColor: data.fgColor,
+            });
+          }
         }
       }
 
@@ -344,12 +348,15 @@ export class PowerlineRenderer {
       );
 
       if (segmentData) {
-        renderedSegments.push({
-          type: segment.type,
-          text: segmentData.text,
-          bgColor: segmentData.bgColor,
-          fgColor: segmentData.fgColor,
-        });
+        const dataArray = Array.isArray(segmentData) ? segmentData : [segmentData];
+        for (const data of dataArray) {
+          renderedSegments.push({
+            type: segment.type,
+            text: data.text,
+            bgColor: data.bgColor,
+            fgColor: data.fgColor,
+          });
+        }
       }
     }
 
@@ -367,7 +374,7 @@ export class PowerlineRenderer {
     rateLimitsInfo: RateLimitsInfo | null,
     colors: PowerlineColors,
     currentDir: string
-  ) {
+  ): Promise<SegmentData | SegmentData[] | null> {
     if (segment.type === "directory") {
       return this.segmentRenderer.renderDirectory(
         hookData,
@@ -553,8 +560,8 @@ export class PowerlineRenderer {
     config: RateLimitsSegmentConfig,
     rateLimitsInfo: RateLimitsInfo | null,
     colors: PowerlineColors
-  ) {
-    if (!this.needsSegmentInfo("rateLimits")) return null;
+  ): SegmentData[] {
+    if (!this.needsSegmentInfo("rateLimits")) return [];
     return this.segmentRenderer.renderRateLimits(rateLimitsInfo, colors, config);
   }
 

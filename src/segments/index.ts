@@ -24,4 +24,5 @@ export {
   VersionSegmentConfig,
   EnvSegmentConfig,
   RateLimitsSegmentConfig,
+  SegmentData,
 } from "./renderer";
