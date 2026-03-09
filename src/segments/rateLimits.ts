@@ -7,8 +7,11 @@ import { debug } from "../utils/logger";
 import type { ClaudeHookData } from "../utils/claude";
 
 const USAGE_ENDPOINT = "https://api.anthropic.com/api/oauth/usage";
+const TOKEN_REFRESH_ENDPOINT = "https://platform.claude.com/v1/oauth/token";
 const BETA_HEADER = "oauth-2025-04-20";
 const CACHE_TTL_MS = 30_000;
+const FALLBACK_CLAUDE_VERSION = "2.1.0";
+const OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 
 export interface RateLimitsInfo {
   session?: {
@@ -49,6 +52,13 @@ interface CredentialsFile {
   };
 }
 
+interface TokenRefreshResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  token_type: string;
+}
+
 interface CacheEntry {
   data: RateLimitsInfo;
   timestamp: number;
@@ -60,6 +70,12 @@ export class RateLimitsProvider {
     RateLimitsProvider.cacheDir,
     "rate-limits-cache.json",
   );
+  private static readonly tokenCacheFile = join(
+    RateLimitsProvider.cacheDir,
+    "token-cache.json",
+  );
+
+  private cachedClaudeVersion: string | null = null;
 
   async getRateLimitsInfo(
     hookData: ClaudeHookData,
@@ -89,21 +105,23 @@ export class RateLimitsProvider {
     const cached = await this.readCache();
     if (cached) return cached;
 
-    const token = await this.loadAccessToken();
-    if (!token) {
+    const tokenData = await this.loadAccessTokenWithRefresh();
+    if (!tokenData) {
       debug("No OAuth access token found");
       return null;
     }
+
+    const userAgent = await this.getClaudeUserAgent();
 
     try {
       const response = await fetch(USAGE_ENDPOINT, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${tokenData.accessToken}`,
           Accept: "application/json",
           "Content-Type": "application/json",
           "anthropic-beta": BETA_HEADER,
-          "User-Agent": "claude-powerline",
+          "User-Agent": userAgent,
         },
         signal: AbortSignal.timeout(10_000),
       });
@@ -157,30 +175,175 @@ export class RateLimitsProvider {
     return info;
   }
 
-  private async loadAccessToken(): Promise<string | null> {
+  private async getClaudeUserAgent(): Promise<string> {
+    if (this.cachedClaudeVersion) {
+      return `claude-code/${this.cachedClaudeVersion}`;
+    }
+
+    const version = await this.detectClaudeVersion();
+    this.cachedClaudeVersion = version;
+    return `claude-code/${version}`;
+  }
+
+  private detectClaudeVersion(): Promise<string> {
+    return new Promise((resolve) => {
+      execFile(
+        "claude",
+        ["--version"],
+        { timeout: 5000 },
+        (err, stdout) => {
+          if (err || !stdout.trim()) {
+            resolve(FALLBACK_CLAUDE_VERSION);
+            return;
+          }
+          const trimmed = stdout.trim().split(/\s+/)[0];
+          resolve(trimmed || FALLBACK_CLAUDE_VERSION);
+        },
+      );
+    });
+  }
+
+  private async loadAccessTokenWithRefresh(): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+  } | null> {
+    const creds = await this.loadCredentials();
+    const oauth = creds?.claudeAiOauth;
+    const accessToken = oauth?.accessToken;
+
+    if (!accessToken) {
+      return null;
+    }
+
+    const now = Date.now();
+
+    if (oauth.expiresAt && oauth.expiresAt < now && oauth.refreshToken) {
+      debug("Access token expired, attempting refresh");
+      const refreshed = await this.refreshAccessToken(oauth.refreshToken);
+      if (refreshed) {
+        await this.saveRefreshedToken(refreshed);
+        return {
+          accessToken: refreshed.access_token,
+          refreshToken: refreshed.refresh_token,
+          expiresAt: now + refreshed.expires_in * 1000,
+        };
+      }
+      debug("Token refresh failed, using existing token");
+    }
+
+    return {
+      accessToken,
+      refreshToken: oauth.refreshToken,
+      expiresAt: oauth.expiresAt,
+    };
+  }
+
+  private async refreshAccessToken(
+    refreshToken: string,
+  ): Promise<TokenRefreshResponse | null> {
+    try {
+      const body = new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: OAUTH_CLIENT_ID,
+      });
+
+      const response = await fetch(TOKEN_REFRESH_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: body.toString(),
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!response.ok) {
+        debug(`Token refresh failed: ${response.status}`);
+        return null;
+      }
+
+      return (await response.json()) as TokenRefreshResponse;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      debug(`Token refresh error: ${msg}`);
+      return null;
+    }
+  }
+
+  private async saveRefreshedToken(
+    tokenData: TokenRefreshResponse,
+  ): Promise<void> {
+    try {
+      if (!existsSync(RateLimitsProvider.cacheDir)) {
+        await mkdir(RateLimitsProvider.cacheDir, { recursive: true });
+      }
+
+      const cache = {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: Date.now() + tokenData.expires_in * 1000,
+      };
+
+      await writeFile(
+        RateLimitsProvider.tokenCacheFile,
+        JSON.stringify(cache),
+        "utf-8",
+      );
+    } catch (err) {
+      debug(`Failed to save refreshed token: ${err}`);
+    }
+  }
+
+  private async loadCredentials(): Promise<CredentialsFile | null> {
+    const tokenCache = await this.loadTokenCache();
+    if (tokenCache) {
+      return {
+        claudeAiOauth: tokenCache,
+      };
+    }
+
     const credentialsPath = join(homedir(), ".claude", ".credentials.json");
     if (existsSync(credentialsPath)) {
       try {
         const content = await readFile(credentialsPath, "utf-8");
-        const creds = JSON.parse(content) as CredentialsFile;
-        const token = creds.claudeAiOauth?.accessToken;
-        if (token) return token;
+        return JSON.parse(content) as CredentialsFile;
       } catch (err) {
         debug(`Failed to read credentials file: ${err}`);
       }
     }
 
-    try {
-      const token = await this.readFromKeychain();
-      if (token) return token;
-    } catch (err) {
-      debug(`Failed to read from keychain: ${err}`);
+    const keychainCreds = await this.readFromKeychain();
+    if (keychainCreds) {
+      return keychainCreds;
     }
 
     return null;
   }
 
-  private readFromKeychain(): Promise<string | null> {
+  private async loadTokenCache(): Promise<CredentialsFile["claudeAiOauth"] | null> {
+    try {
+      if (!existsSync(RateLimitsProvider.tokenCacheFile)) return null;
+
+      const content = await readFile(RateLimitsProvider.tokenCacheFile, "utf-8");
+      const cache = JSON.parse(content) as {
+        accessToken: string;
+        refreshToken?: string;
+        expiresAt?: number;
+      };
+
+      if (cache.expiresAt && cache.expiresAt < Date.now()) {
+        return null;
+      }
+
+      return cache;
+    } catch {
+      return null;
+    }
+  }
+
+  private readFromKeychain(): Promise<CredentialsFile | null> {
     return new Promise((resolve) => {
       execFile(
         "security",
@@ -193,7 +356,7 @@ export class RateLimitsProvider {
           }
           try {
             const creds = JSON.parse(stdout.trim()) as CredentialsFile;
-            resolve(creds.claudeAiOauth?.accessToken ?? null);
+            resolve(creds);
           } catch {
             resolve(null);
           }

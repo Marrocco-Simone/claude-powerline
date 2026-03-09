@@ -9,6 +9,7 @@
     "claude-powerline": "./dist/index.js"
   },
   "scripts": {
+    "types": "tsc --noEmit",
     "build": "tsup",
     "dev": "tsup --watch",
     "start": "node dist/index.js",
