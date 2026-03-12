@@ -40,6 +40,19 @@ Our implementation is in `src/segments/rateLimits.ts`:
 - `RateLimitsProvider.refreshAccessToken()` - Token refresh logic
 - `RateLimitsProvider.detectClaudeVersion()` - Version detection for User-Agent
 
+### Known Issues
+
+**OAuth API 429 Rate Limiting** (as of March 2026):
+- The `/api/oauth/usage` endpoint returns persistent 429 errors
+- Tracked in [anthropics/claude-code#31021](https://github.com/anthropics/claude-code/issues/31021)
+- Workaround: Cache TTL increased to 5 minutes to reduce API calls
+- Alternative: Wait for [anthropics/claude-code#27915](https://github.com/anthropics/claude-code/issues/27915) which would expose `rate_limits` directly in hook data
+
+**CodexBar Fallback Mechanisms** (for reference):
+- CodexBar uses 3 fallback paths: OAuth API → CLI PTY → Web API (cookies)
+- CLI PTY runs `claude --allowed-tools ""` and sends `/usage` command
+- See [CodexBar docs/claude.md](https://github.com/steipete/CodexBar/blob/main/docs/claude.md)
+
 ## Development
 
 ```bash
