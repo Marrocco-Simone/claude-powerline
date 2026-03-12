@@ -9,7 +9,7 @@ import type { ClaudeHookData } from "../utils/claude";
 const USAGE_ENDPOINT = "https://api.anthropic.com/api/oauth/usage";
 const TOKEN_REFRESH_ENDPOINT = "https://platform.claude.com/v1/oauth/token";
 const BETA_HEADER = "oauth-2025-04-20";
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 300_000; // 5 minutes - increased due to OAuth API 429 rate limiting (Issue #31021)
 const FALLBACK_CLAUDE_VERSION = "2.1.0";
 const OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 
