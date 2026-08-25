@@ -159,6 +159,19 @@ export function minutesUntilReset(epochSeconds: number): number {
   return Math.round(Math.max(0, epochSeconds * 1000 - Date.now()) / 60000);
 }
 
+export function minutesUntilResetValue(resetAt: number | string): number {
+  if (typeof resetAt === "number") {
+    return minutesUntilReset(resetAt);
+  }
+
+  const resetTime = Date.parse(resetAt);
+  if (Number.isNaN(resetTime)) {
+    return 0;
+  }
+
+  return Math.round(Math.max(0, resetTime - Date.now()) / 60000);
+}
+
 export function formatCacheTimerElapsed(seconds: number): string {
   if (seconds >= 3600) return "1h+";
   if (seconds >= 300) return `${Math.floor(seconds / 60)}m`;

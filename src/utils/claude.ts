@@ -52,6 +52,14 @@ export interface ClaudeHookData {
       used_percentage: number;
       resets_at: number;
     };
+    session?: {
+      used_percentage: number;
+      resets_at: number | string;
+    };
+    weekly?: {
+      used_percentage: number;
+      resets_at: number | string;
+    };
   };
   worktree?: {
     name: string;

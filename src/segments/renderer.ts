@@ -30,7 +30,7 @@ import {
   formatCacheTimerElapsed,
   formatCacheTimerRemaining,
   collapseHome,
-  minutesUntilReset,
+  minutesUntilResetValue,
 } from "../utils/formatters";
 import { resolveBudgetDisplay } from "../utils/budget";
 import type { BudgetItemConfig } from "../config/loader";
@@ -733,12 +733,12 @@ export class SegmentRenderer {
     colors: PowerlineColors,
     config?: WeeklySegmentConfig,
   ): SegmentData | null {
-    const sevenDay = hookData.rate_limits?.seven_day;
+    const sevenDay = hookData.rate_limits?.seven_day ?? hookData.rate_limits?.weekly;
     if (!sevenDay) return null;
 
     const pct = Math.round(sevenDay.used_percentage);
     const timeStr = formatLongTimeRemaining(
-      minutesUntilReset(sevenDay.resets_at),
+      minutesUntilResetValue(sevenDay.resets_at),
     );
 
     let bgColor = colors.weeklyBg;

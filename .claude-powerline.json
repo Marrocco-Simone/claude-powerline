@@ -3,7 +3,7 @@
   "display": {
     "padding": 1,
     "style": "capsule",
-    "charset": "unicode",
+    "charset": "text",
     "colorCompatibility": "auto",
     "autoWrap": true,
     "lines": [
@@ -31,8 +31,11 @@
         "segments": {
           "block": {
             "enabled": true,
-            "type": "weighted",
-            "burnType": "tokens"
+            "displayStyle": "text"
+          },
+          "weekly": {
+            "enabled": true,
+            "displayStyle": "text"
           },
           "version": {
             "enabled": true
@@ -94,6 +97,10 @@
       },
       "block": {
         "bg": "#404040",
+        "fg": "#cccccc"
+      },
+      "weekly": {
+        "bg": "#454545",
         "fg": "#cccccc"
       },
       "today": {
